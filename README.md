@@ -4,9 +4,9 @@ A comprehensive graph-based fraud detection system that identifies money muling 
 
 ## 🔗 Live Demo
 
-**Live Demo URL:** _[To be submitted]_
+**Live Demo URL:**     https://blitzrift.vercel.app/
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend
 - **Framework:** FastAPI 0.115.5
@@ -22,7 +22,7 @@ A comprehensive graph-based fraud detection system that identifies money muling 
 - **HTTP Client:** Axios 1.7.9
 - **Graph Visualization:** Cytoscape.js 3.30.3 + react-cytoscapejs 1.2.1
 
-## 🏗️ System Architecture
+## System Architecture
 
 The application follows a **monorepo architecture** with clear separation between backend and frontend:
 
@@ -214,7 +214,7 @@ The system uses a **weighted scoring system** where different patterns contribut
 cd backend
 ```
 
-2. Create a virtual environment (recommended):
+2. Create a virtual environment 
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -280,11 +280,11 @@ npm run preview
 
 The system expects CSV files with the following required columns:
 
-- `transaction_id` - Unique identifier for each transaction
-- `sender_id` - Account ID of the sender
-- `receiver_id` - Account ID of the receiver
-- `amount` - Transaction amount (numeric)
-- `timestamp` - Transaction timestamp in format: `YYYY-MM-DD HH:MM:SS`
+- `transaction_id` - Unique identifier for each transaction (String)
+- `sender_id` - Account ID of the sender (String)
+- `receiver_id` - Account ID of the receiver (String)
+- `amount` - Transaction amount (float) 
+- `timestamp` - Transaction timestamp in format: `YYYY-MM-DD HH:MM:SS` (Date time)
 
 **Example CSV:**
 ```csv
@@ -360,10 +360,8 @@ curl http://localhost:8000/health
 
 10. **Timestamp Format:** Only supports `YYYY-MM-DD HH:MM:SS` timestamp format. Other formats will cause parsing errors.
 
-## 📝 License
+## team members
 
-This project is part of the Money Muling Detection Challenge.
-
----
-
-**Note:** This system is designed for educational and demonstration purposes. For production use in financial systems, additional security, compliance, and validation measures should be implemented.
+1.Chandru Manjunath
+2.Darshan B M
+3.Dhanush M
