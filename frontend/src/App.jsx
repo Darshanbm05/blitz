@@ -31,7 +31,14 @@ function buildElements(graph) {
   return elements;
 }
 
-const layout = { name: "cose", animate: false };
+// For large graphs (up to ~10K edges), a simpler layout is more stable than
+// force-directed layouts like "cose", which can be expensive and feel like hangs.
+const layout = {
+  name: "concentric",
+  animate: false,
+  fit: true,
+  padding: 20,
+};
 
 const stylesheet = [
   {
