@@ -3,6 +3,8 @@ from io import StringIO
 import csv
 import time
 from typing import List
+from dotenv import load_dotenv
+import os
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,13 +24,18 @@ REQUIRED_COLUMNS = [
 
 app = FastAPI(title="Money Muling Detection Engine")
 
+
+load_dotenv()
+origins = os.getenv("CORS_ORIGINS", "").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 def parse_csv(file_bytes: bytes) -> List[Transaction]:
