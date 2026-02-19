@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import CytoscapeComponent from "react-cytoscapejs";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 function buildElements(graph) {
   if (!graph) return [];
@@ -31,7 +31,12 @@ function buildElements(graph) {
   return elements;
 }
 
-const layout = { name: "cose", animate: false };
+const layout = {
+  name: "concentric",
+  animate: false,
+  fit: true,
+  padding: 20,
+};
 
 const stylesheet = [
   {
@@ -74,6 +79,11 @@ export default function App() {
   const [error, setError] = useState("");
   const [analysis, setAnalysis] = useState(null);
   const [graph, setGraph] = useState(null);
+  // View modes for graph filtering: show everything or only cycle-participating nodes
+  const [viewMode, setViewMode] = useState("all"); // all | cycles
+  const [selectedRingId, setSelectedRingId] = useState(null);
+  const [cyRef, setCyRef] = useState(null);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const onFileChange = (e) => {
     setFile(e.target.files[0] || null);
@@ -91,6 +101,8 @@ export default function App() {
       });
       setAnalysis(res.data.result);
       setGraph(res.data.graph);
+      setViewMode("all");
+      setSelectedRingId(null);
     } catch (err) {
       console.error(err);
       const msg =
@@ -117,6 +129,106 @@ export default function App() {
   };
 
   const elements = buildElements(graph);
+
+  // Filter visibility in the existing graph without re-rendering heavy layouts
+  useEffect(() => {
+    if (!cyRef || !analysis) return;
+    // In React StrictMode, Cytoscape instances can be created/destroyed twice.
+    // Skip any work if this instance has already been destroyed.
+    if (typeof cyRef.destroyed === "function" && cyRef.destroyed()) return;
+
+    const nodes = cyRef.nodes();
+    const edges = cyRef.edges();
+
+    if (viewMode === "all") {
+      nodes.show();
+      edges.show();
+      // Fit to all nodes but with small padding; avoid huge jumps if graph is very large
+      if (nodes.length > 0) {
+        try {
+          cyRef.fit(nodes, 40);
+        } catch (e) {
+          // If Cytoscape instance is in an invalid state, avoid crashing the app.
+          console.error("Cytoscape fit(all) failed:", e);
+        }
+      }
+      return;
+    }
+
+    if (viewMode === "cycles") {
+      nodes.forEach((n) => {
+        const patternsStr = n.data("patterns") || "";
+        const patterns = patternsStr
+          .split(",")
+          .map((p) => p.trim())
+          .filter(Boolean);
+        const hasCycle = patterns.some((p) => p.startsWith("cycle_length_"));
+        if (hasCycle) n.show();
+        else n.hide();
+      });
+    }
+
+    // Show edges only if both endpoints are visible
+    edges.forEach((e) => {
+      const srcVisible = e.source().visible();
+      const tgtVisible = e.target().visible();
+      if (srcVisible && tgtVisible) e.show();
+      else e.hide();
+    });
+
+    // After changing view mode, auto-zoom to visible nodes to reduce long edges
+    const visibleNodes = nodes.filter((n) => n.visible());
+    if (visibleNodes.length > 0) {
+      try {
+        cyRef.fit(visibleNodes, 40);
+      } catch (e) {
+        console.error("Cytoscape fit(filtered) failed:", e);
+      }
+    }
+  }, [viewMode, cyRef, analysis]);
+
+  const highlightRing = (ring) => {
+    if (!cyRef || !ring) return;
+    if (typeof cyRef.destroyed === "function" && cyRef.destroyed()) return;
+    setSelectedRingId(ring.ring_id);
+
+    const memberSet = new Set(ring.member_accounts || []);
+
+    // Clear previous highlights
+    cyRef.elements().removeClass("highlighted-node highlighted-edge");
+
+    // Highlight member nodes
+    cyRef.nodes().forEach((n) => {
+      if (memberSet.has(n.id())) {
+        n.addClass("highlighted-node");
+      }
+    });
+
+    // Highlight edges fully inside the ring
+    cyRef.edges().forEach((e) => {
+      const src = e.source().id();
+      const tgt = e.target().id();
+      if (memberSet.has(src) && memberSet.has(tgt)) {
+        e.addClass("highlighted-edge");
+      }
+    });
+
+    // Zoom in to just this ring for a clear local view
+    const ringNodes = cyRef.nodes().filter((n) => memberSet.has(n.id()));
+    const ringEdges = cyRef.edges().filter((e) => {
+      const src = e.source().id();
+      const tgt = e.target().id();
+      return memberSet.has(src) && memberSet.has(tgt);
+    });
+    const collection = ringNodes.union(ringEdges);
+    if (collection.length > 0) {
+      try {
+        cyRef.fit(collection, 60);
+      } catch (e) {
+        console.error("Cytoscape fit(ring) failed:", e);
+      }
+    }
+  };
 
   return (
     <div className="app">
@@ -163,14 +275,44 @@ export default function App() {
       )}
 
       <main className="main-layout">
-        <section className="graph-section">
+        <section
+          className={
+            fullscreen ? "graph-section graph-section-fullscreen" : "graph-section"
+          }
+        >
           <h2>Interactive Graph Viewer</h2>
+          <div className="graph-toolbar">
+            <span>View:</span>
+            <button
+              type="button"
+              className={viewMode === "all" ? "chip chip-active" : "chip"}
+              onClick={() => setViewMode("all")}
+            >
+              All accounts
+            </button>
+            <button
+              type="button"
+              className={viewMode === "cycles" ? "chip chip-active" : "chip"}
+              onClick={() => setViewMode("cycles")}
+            >
+              Cycle rings
+            </button>
+            <div className="graph-toolbar-spacer" />
+            <button
+              type="button"
+              className="chip"
+              onClick={() => setFullscreen((prev) => !prev)}
+            >
+              {fullscreen ? "Exit full screen" : "Full screen"}
+            </button>
+          </div>
           {elements.length > 0 ? (
             <CytoscapeComponent
               elements={elements}
               style={{ width: "100%", height: "500px", borderRadius: 8 }}
               layout={layout}
               stylesheet={stylesheet}
+              cy={(cy) => setCyRef(cy)}
             />
           ) : (
             <div className="placeholder">
@@ -195,7 +337,15 @@ export default function App() {
                 </thead>
                 <tbody>
                   {analysis.fraud_rings.map((ring) => (
-                    <tr key={ring.ring_id}>
+                    <tr
+                      key={ring.ring_id}
+                      onClick={() => highlightRing(ring)}
+                      className={
+                        selectedRingId === ring.ring_id
+                          ? "row-clickable row-active"
+                          : "row-clickable"
+                      }
+                    >
                       <td>{ring.ring_id}</td>
                       <td>{ring.pattern_type}</td>
                       <td>{ring.member_accounts.length}</td>
